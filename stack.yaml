@@ -1,0 +1,9 @@
+resolver: lts-16.20
+
+extra-deps:
+  # for Windows
+    - regex-posix-clib-2.7
+
+flags:
+  regex-posix:
+    _regex-posix-clib: true  # for windows
