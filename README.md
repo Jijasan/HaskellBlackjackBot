@@ -1,5 +1,5 @@
 # Telegram blackjack bot
-Try bot: @black_jack_func_bot
+Try bot: @black_jack_func_bot \
 Usage: send "help" message to bot
 
 # Local run
