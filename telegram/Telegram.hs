@@ -13,6 +13,8 @@ module Telegram
   , User (..)
   , production
   , Dice (..)
+  , Ok(..)
+  , telegramRpc
   ) where
 
 import           Control.Lens  ((^.))
@@ -69,6 +71,7 @@ data Telegram = Telegram
   { getUpdates  :: Maybe Integer -> IO [Update]
   , sendMessage :: Integer -> Text -> IO ()
   , putLog      :: String -> IO ()
+  , token       :: Token
   }
 
 production :: Token -> Telegram

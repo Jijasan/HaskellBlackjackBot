@@ -13,8 +13,10 @@ library auction
   import: language
   build-depends:
     aeson,
+    bytestring,
     lens,
     monad-logger,
+    network-simple,
     persistent, persistent-sqlite, persistent-template,
     random, resourcet,
     time,

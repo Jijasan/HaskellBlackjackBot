@@ -5,31 +5,61 @@ module Auction (Bot (..), auction) where
 
 import           Prelude           hiding (id)
 
-import           Control.Exception (catchJust)
-import           Control.Monad     (guard, void, join)
-import           Data.Foldable     (for_)
-import           Data.Text         (Text)
-import qualified Data.Text         as Text
-import           Database          (EntityField (StakeValue, StakeUsername), Stake (..), runDb)
-import           Database.Persist  (entityVal, selectList, upsert, (=.), (-=.), (==.))
-import           System.IO.Error   (isDoesNotExistError)
+import           Data.ByteString.Char8      (unpack)
+import           Data.ByteString.Lazy.Char8 (pack)
+
+import           Network.Wreq       (FormParam ((:=)))
+import           System.Environment (getEnv)
+import           Network.Simple.TCP (Socket, serve, recv, HostPreference(Host))
+import           Data.Aeson         (FromJSON, decode)
+import           Control.Exception  (catchJust)
+import           Control.Monad      (guard, void, join)
+import           Data.Foldable      (for_)
+import           Data.Text          (Text)
+import qualified Data.Text          as Text
+import           Database           (EntityField (StakeValue, StakeUsername), Stake (..), runDb)
+import           Database.Persist   (entityVal, selectList, upsert, (=.), (-=.), (==.))
+import           System.IO.Error    (isDoesNotExistError)
 import           System.Random
-import           Telegram          (Chat (..), Message (..), Telegram (..),
-                                    Update (..), User (..), Dice (..))
-import           Text.Read         (readMaybe)
+import           Telegram           (Chat (..), Message (..), Telegram (..),
+                                    Update (..), User (..), Dice (..), Ok(..), telegramRpc)
+import           Text.Read          (readMaybe)
 
 data Bot = Bot
   { databaseFile :: FilePath
   , updateIdFile :: FilePath
   }
 
+foldWhile :: Bool -> Socket -> (Socket -> IO ([Char], Bool)) -> IO [Char]
+foldWhile cond socket f = if cond
+  then pure []
+  else do
+    (str, cond1) <- f socket
+    (++) <$> pure str <*> foldWhile cond1 socket f
+
+receiveLine :: Socket -> IO ([Char], Bool)
+receiveLine socket = do
+  str <- recv socket 10000 
+  print str
+  case str of
+    Nothing -> pure ([], True)
+    Just s -> pure (Data.ByteString.Char8.unpack s, False)
+
 auction :: Telegram -> Bot -> IO ()
-auction telegram@Telegram{getUpdates, putLog} bot@Bot{updateIdFile} = do
+auction telegram@Telegram{getUpdates, putLog, token} bot@Bot{updateIdFile} = do
+  url <- getEnv "WEBHOOK_URL"
+  _ <- (telegramRpc token "setWebhook" ["url" := url]) :: IO Bool
   updateIdM <- loadUpdateId updateIdFile
   putLog "Waiting for updates..."
-  updates <- getUpdates updateIdM
-  putLog $ "Got " <> show (length updates) <> " updates"
-  for_ updates $ validateUpdate telegram bot
+  serve (Host "127.0.0.1") "8443" $ \(connectionSocket, remoteAddr) -> do
+    Prelude.putStrLn $ "TCP connection established from " ++ show remoteAddr
+    str <- foldWhile False connectionSocket receiveLine
+    print str
+    updates <- case decode (Data.ByteString.Lazy.Char8.pack str) of
+        Nothing -> pure []
+        Just Ok{ok, result} -> pure (result :: [Update])
+    putLog $ "Got " <> show (length updates) <> " updates"
+    for_ updates $ validateUpdate telegram bot
 
 validateUpdate :: Telegram -> Bot -> Update -> IO ()
 validateUpdate telegram bot update@Update{update_id, message} = case message of
