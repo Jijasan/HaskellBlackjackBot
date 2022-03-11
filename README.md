@@ -5,6 +5,6 @@ Usage: send "help" message to bot
 # Local run
 Set environment variable TELEGRAM_BOT_TOKEN to token of your bot and run
 ```
-while stack run bot; do echo; done
+stack run bot
 ``` 
 from main project directory
